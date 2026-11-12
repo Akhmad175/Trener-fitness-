@@ -1,0 +1,814 @@
+<title>Дневник калорий</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky day bar on top; two columns on wide screens (day log | goal & charts), one column on phones */
+:root {
+  --bg: #F2F5F3;
+  --surface: #FFFFFF;
+  --surface-2: #E8EEEA;
+  --fg: #142019;
+  --muted: #5B6B62;
+  --line: #D3DDD7;
+  --accent: #17704F;
+  --accent-soft: #D5EDE2;
+  --prot: #2F64D0;
+  --fat: #C9861F;
+  --carb: #7A55C4;
+  --over: #C23E32;
+  --over-soft: #F8DEDA;
+  --font-display: "Unbounded", "Manrope", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1613; --surface: #17211C; --surface-2: #1F2B25; --fg: #E6EEE9; --muted: #93A49A;
+    --line: #2C3A33; --accent: #4CC895; --accent-soft: #1C3A2E; --prot: #6E9BF2; --fat: #E3A94C;
+    --carb: #A98BEA; --over: #F07466; --over-soft: #3D211E; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1613; --surface: #17211C; --surface-2: #1F2B25; --fg: #E6EEE9; --muted: #93A49A;
+  --line: #2C3A33; --accent: #4CC895; --accent-soft: #1C3A2E; --prot: #6E9BF2; --fat: #E3A94C;
+  --carb: #A98BEA; --over: #F07466; --over-soft: #3D211E; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+h1, h2 { font-family: var(--font-display); font-weight: 700; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: 1.15rem; }
+h2 { font-size: 0.95rem; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar-in { max-width: 1180px; margin: 0 auto; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between; }
+.daynav { display: flex; align-items: center; gap: 6px; }
+.daynav .date { min-width: 150px; text-align: center; font-weight: 700; }
+.status { font-size: 0.78rem; color: var(--muted); width: 100%; }
+.status.warn { color: var(--over); }
+
+main { max-width: 1180px; margin: 0 auto; padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.col { display: grid; gap: 18px; min-width: 0; }
+@media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); padding: 8px 12px; font-weight: 600; }
+button:hover { background: var(--surface-2); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+button.primary:hover { filter: brightness(1.08); background: var(--accent); }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 8px; }
+button.ghost:hover { color: var(--over); background: var(--over-soft); }
+button.icon { width: 38px; height: 38px; padding: 0; display: grid; place-items: center; font-size: 1.1rem; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; width: 100%; min-width: 0; }
+input[type="number"] { font-family: var(--font-num); }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > span { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+
+/* Summary */
+.kcal-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.kcal-big .eaten { font-family: var(--font-display); font-size: 2.3rem; font-weight: 700; line-height: 1; }
+.kcal-big .of { color: var(--muted); }
+.left-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 0.82rem; background: var(--accent-soft); color: var(--accent); }
+.left-pill.over { background: var(--over-soft); color: var(--over); }
+.bar { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 999px; background: var(--accent); transition: width .3s; }
+.bar.over > i { background: var(--over); }
+.macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.macro { display: grid; gap: 6px; }
+.macro .row { display: flex; justify-content: space-between; gap: 6px; font-size: 0.85rem; }
+.macro .bar { height: 7px; }
+.macro.p .bar > i { background: var(--prot); }
+.macro.f .bar > i { background: var(--fat); }
+.macro.c .bar > i { background: var(--carb); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+/* Add form */
+.form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.span-6 { grid-column: span 6; } .span-4 { grid-column: span 4; } .span-3 { grid-column: span 3; } .span-2 { grid-column: span 2; } .span-1 { grid-column: span 1; }
+@media (max-width: 520px) {
+  .form-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .span-6, .span-4 { grid-column: span 4; } .span-3 { grid-column: span 4; } .span-2 { grid-column: span 2; } .span-1 { grid-column: span 1; }
+}
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 10px; font-size: 0.82rem; background: transparent; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.preview { font-size: 0.85rem; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.preview b { color: var(--fg); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.8rem; padding: 5px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid transparent; font-weight: 600; }
+.chip:hover { border-color: var(--accent); background: var(--surface-2); }
+.hint { font-size: 0.78rem; color: var(--muted); }
+.form-error { color: var(--over); font-size: 0.82rem; font-weight: 600; }
+
+/* Log */
+.meal { display: grid; gap: 2px; }
+.meal-head { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.meal-head .label { color: var(--fg); }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.item .name { font-weight: 600; overflow-wrap: anywhere; }
+.item .meta { font-size: 0.78rem; color: var(--muted); }
+.item .kc { font-weight: 600; }
+.empty { padding: 18px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); text-align: center; font-size: 0.9rem; }
+
+/* Goal */
+.goal-top { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.stat .v { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; }
+.stat .s { font-size: 0.75rem; color: var(--muted); }
+@media (max-width: 420px) { .goal-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.track { position: relative; height: 14px; border-radius: 999px; background: var(--surface-2); }
+.track > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+.track .tick { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--line); }
+.track-labels { position: relative; height: 18px; font-size: 0.72rem; color: var(--muted); }
+.track-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.track-labels span:first-child { transform: none; }
+.track-labels span:last-child { transform: translateX(-100%); }
+.stages { display: grid; gap: 8px; }
+.stage { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 0.9rem; }
+.badge { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.badge.done { background: var(--accent-soft); color: var(--accent); }
+.badge.now { background: var(--accent); color: var(--surface); }
+.weight-row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.weight-row .field { flex: 1 1 140px; }
+
+/* Charts */
+.chart-wrap { overflow-x: auto; }
+svg.chart { width: 100%; height: auto; display: block; }
+svg .grid { stroke: var(--line); stroke-width: 1; }
+svg .axis { fill: var(--muted); font-size: 11px; font-family: var(--font-num); }
+svg .goalline { stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.5; }
+svg .stageline { stroke: var(--muted); stroke-dasharray: 2 4; stroke-width: 1; }
+svg .wline { stroke: var(--prot); stroke-width: 2.5; fill: none; stroke-linejoin: round; }
+svg .warea { fill: var(--prot); opacity: 0.12; }
+svg .wdot { fill: var(--surface); stroke: var(--prot); stroke-width: 2; }
+svg .wdot.last { fill: var(--prot); }
+svg .lbl { font-size: 11px; font-family: var(--font-body); font-weight: 700; }
+svg .lbl.goal { fill: var(--accent); }
+svg .lbl.stage { fill: var(--muted); }
+svg .bar-ok { fill: var(--accent); }
+svg .bar-over { fill: var(--over); }
+svg .bar-sel { stroke: var(--fg); stroke-width: 1.5; }
+svg .target { stroke: var(--fg); stroke-dasharray: 4 4; stroke-width: 1.2; opacity: .6; }
+svg .chart-empty { fill: var(--muted); font-size: 13px; font-family: var(--font-body); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+
+details.settings summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; list-style: none; display: flex; justify-content: space-between; }
+details.settings summary::-webkit-details-marker { display: none; }
+details.settings summary::after { content: "+"; color: var(--muted); }
+details.settings[open] summary::after { content: "–"; }
+details.settings[open] summary { margin-bottom: 14px; }
+.saved-note { color: var(--accent); font-size: 0.82rem; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <h1>Дневник калорий</h1>
+    <div class="daynav">
+      <button class="icon" id="prevDay" aria-label="Предыдущий день">‹</button>
+      <div class="date" id="dateLabel">—</div>
+      <button class="icon" id="nextDay" aria-label="Следующий день">›</button>
+      <button id="todayBtn">Сегодня</button>
+    </div>
+    <div class="status" id="status">Подключаюсь к хранилищу…</div>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card" aria-labelledby="sumTitle">
+      <div class="card-head">
+        <h2 id="sumTitle">Итог дня</h2>
+        <span class="left-pill" id="leftPill">—</span>
+      </div>
+      <div class="kcal-big"><span class="eaten num" id="eaten">0</span><span class="of">из <span class="num" id="target">2700</span> ккал</span></div>
+      <div class="bar" id="kcalBar"><i style="width:0%"></i></div>
+      <div class="macros">
+        <div class="macro p"><div class="row"><span><span class="dot" style="background:var(--prot)"></span>Белки</span><span class="num" id="mP">0 / 180 г</span></div><div class="bar"><i id="bP" style="width:0%"></i></div></div>
+        <div class="macro f"><div class="row"><span><span class="dot" style="background:var(--fat)"></span>Жиры</span><span class="num" id="mF">0 / 80 г</span></div><div class="bar"><i id="bF" style="width:0%"></i></div></div>
+        <div class="macro c"><div class="row"><span><span class="dot" style="background:var(--carb)"></span>Углев.</span><span class="num" id="mC">0 / 315 г</span></div><div class="bar"><i id="bC" style="width:0%"></i></div></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="addTitle">
+      <div class="card-head">
+        <h2 id="addTitle">Добавить продукт</h2>
+        <div class="seg" role="group" aria-label="Как указаны значения">
+          <button type="button" id="mode100" aria-pressed="true">на 100 г</button>
+          <button type="button" id="modePortion" aria-pressed="false">на порцию</button>
+        </div>
+      </div>
+      <div class="chips" id="quickChips" aria-label="Частые продукты"></div>
+      <form id="addForm" class="form-grid" autocomplete="off">
+        <label class="field span-4"><span>Продукт</span><input id="fName" list="foodList" placeholder="Например: Гречка (сухая)" required></label>
+        <label class="field span-2"><span>Приём пищи</span>
+          <select id="fMeal"><option>Завтрак</option><option>Обед</option><option>Ужин</option><option>Перекус</option></select>
+        </label>
+        <label class="field span-2" id="gramsField"><span>Вес, г</span><input id="fGrams" type="number" min="0" step="1" inputmode="decimal" placeholder="100"></label>
+        <label class="field span-1"><span id="kcalLbl">Ккал/100</span><input id="fKcal" type="number" min="0" step="0.1" inputmode="decimal" required></label>
+        <label class="field span-1"><span>Б</span><input id="fP" type="number" min="0" step="0.1" inputmode="decimal"></label>
+        <label class="field span-1"><span>Ж</span><input id="fF" type="number" min="0" step="0.1" inputmode="decimal"></label>
+        <label class="field span-1"><span>У</span><input id="fC" type="number" min="0" step="0.1" inputmode="decimal"></label>
+        <div class="span-6 preview" id="preview"><span class="hint">Выберите продукт из списка или впишите свой. Калории и БЖУ можно взять с упаковки.</span></div>
+        <div class="span-6" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="primary" type="submit">Добавить</button>
+          <button type="button" id="pieceBtn" hidden>+1 шт</button>
+          <span class="form-error" id="formError" hidden></span>
+        </div>
+        <datalist id="foodList"></datalist>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="logTitle">
+      <div class="card-head"><h2 id="logTitle">Что съедено</h2><span class="label" id="itemCount"></span></div>
+      <div id="log"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card" aria-labelledby="goalTitle">
+      <div class="card-head"><h2 id="goalTitle">Цель</h2><span class="label num" id="goalRange">121 → 90 кг</span></div>
+      <div class="goal-top">
+        <div class="stat"><span class="s">Сейчас</span><span class="v num" id="gNow">—</span><span class="s" id="gAvg">&nbsp;</span></div>
+        <div class="stat"><span class="s">Сброшено</span><span class="v num" id="gLost">—</span><span class="s" id="gPct">&nbsp;</span></div>
+        <div class="stat"><span class="s">Осталось</span><span class="v num" id="gLeft">—</span><span class="s" id="gEta">&nbsp;</span></div>
+      </div>
+      <div>
+        <div class="track" id="track"><i style="width:0%"></i></div>
+        <div class="track-labels" id="trackLabels"></div>
+      </div>
+      <div class="stages" id="stages"></div>
+      <div class="weight-row">
+        <label class="field"><span id="wLabel">Вес за этот день, кг</span><input id="wInput" type="number" step="0.1" min="30" max="300" inputmode="decimal" placeholder="например 120.4"></label>
+        <button class="primary" id="wSave">Записать вес</button>
+        <button class="ghost" id="wClear" hidden>Убрать</button>
+      </div>
+      <div class="hint">Взвешивайтесь утром натощак 2–3 раза в неделю. Смотрите на среднее за неделю: вес скачет на 1–2 кг из-за воды и соли.</div>
+    </section>
+
+    <section class="card" aria-labelledby="wChartTitle">
+      <div class="card-head"><h2 id="wChartTitle">График веса</h2>
+        <div class="legend"><span><span class="dot" style="background:var(--prot)"></span>вес</span><span><span class="dot" style="background:var(--accent)"></span>цель</span><span><span class="dot" style="background:var(--muted)"></span>этапы</span></div>
+      </div>
+      <div class="chart-wrap" id="wChart"></div>
+    </section>
+
+    <section class="card" aria-labelledby="kChartTitle">
+      <div class="card-head"><h2 id="kChartTitle">Калории за 14 дней</h2>
+        <div class="legend"><span><span class="dot" style="background:var(--accent)"></span>в норме</span><span><span class="dot" style="background:var(--over)"></span>перебор</span><span>- - норма</span></div>
+      </div>
+      <div class="chart-wrap" id="kChart"></div>
+      <div class="hint" id="kAvg"></div>
+    </section>
+
+    <section class="card">
+      <details class="settings" id="settingsBox">
+        <summary>Мои нормы и цель</summary>
+        <form id="setForm" class="form-grid">
+          <label class="field span-2"><span>Калории в день</span><input id="sKcal" type="number" min="1000" step="10"></label>
+          <label class="field span-2"><span>Белки, г</span><input id="sP" type="number" min="0" step="1"></label>
+          <label class="field span-1"><span>Жиры, г</span><input id="sF" type="number" min="0" step="1"></label>
+          <label class="field span-1"><span>Углев., г</span><input id="sC" type="number" min="0" step="1"></label>
+          <label class="field span-2"><span>Стартовый вес, кг</span><input id="sStart" type="number" step="0.1"></label>
+          <label class="field span-2"><span>Цель, кг</span><input id="sGoal" type="number" step="0.1"></label>
+          <label class="field span-2"><span>Дата старта</span><input id="sDate" type="date"></label>
+          <label class="field span-6"><span>Промежуточные этапы, кг (через запятую)</span><input id="sStages" placeholder="110, 100, 90"></label>
+          <div class="span-6" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="primary" type="submit">Сохранить</button>
+            <span class="saved-note" id="setSaved" hidden>Сохранено</span>
+          </div>
+          <div class="span-6 hint">Нормы взяты из плана тренера: 2700 ккал, Б 180 / Ж 80 / У 315. После каждых −10 кг тренер советует снижать калории примерно на 150.</div>
+        </form>
+      </details>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Constants ----------
+  const DEFAULTS = { kcal: 2700, p: 180, f: 80, c: 315, startWeight: 121, goalWeight: 90, startDate: "2026-11-12", stages: [110, 100, 90] };
+  // Values per 100 g: kcal, protein, fat, carbs; piece = grams in one piece/spoon
+  const FOODS = [
+    ["Овсянка (сухая)", 352, 12, 6.2, 61],
+    ["Яйцо куриное", 157, 12.7, 11.5, 0.7, 55, "шт"],
+    ["Куриная грудка", 113, 23.6, 1.9, 0.4],
+    ["Рис (сухой)", 344, 6.7, 0.7, 78.9],
+    ["Гречка (сухая)", 313, 12.6, 3.3, 62],
+    ["Макароны (сухие)", 344, 10.4, 1.1, 71.5],
+    ["Картофель", 77, 2, 0.4, 16.3],
+    ["Творог 5%", 121, 17.2, 5, 1.8],
+    ["Греческий йогурт 2%", 73, 9, 2, 4],
+    ["Кефир 1%", 40, 3, 1, 4],
+    ["Молоко 2,5%", 52, 2.8, 2.5, 4.7],
+    ["Банан", 96, 1.5, 0.5, 21, 120, "шт"],
+    ["Яблоко", 47, 0.4, 0.4, 9.8, 180, "шт"],
+    ["Индейка (филе)", 114, 23, 1.6, 0],
+    ["Белая рыба (минтай, треска)", 72, 15.9, 0.9, 0],
+    ["Говядина", 187, 18.9, 12.4, 0],
+    ["Хлеб цельнозерновой", 247, 13, 3.4, 41, 30, "ломтик"],
+    ["Грецкие орехи", 654, 15.2, 65.2, 7],
+    ["Масло растительное", 899, 0, 99.9, 0, 13, "ст. л."],
+    ["Овощи свежие (огурец, помидор, капуста)", 22, 1, 0.2, 4],
+    ["Сыр твёрдый", 356, 25, 27, 0, 20, "ломтик"],
+    ["Сахар", 399, 0, 0, 99.8, 6, "ч. л."],
+    ["Шоколад молочный", 535, 7, 30, 59],
+    ["Пицца", 260, 11, 10, 31],
+    ["Бургер", 250, 13, 11, 24, 220, "шт"]
+  ].map(a => ({ name: a[0], kcal: a[1], p: a[2], f: a[3], c: a[4], piece: a[5] || 0, unit: a[6] || "" }));
+  const QUICK = ["Овсянка (сухая)", "Яйцо куриное", "Куриная грудка", "Рис (сухой)", "Гречка (сухая)", "Творог 5%", "Банан", "Кефир 1%"];
+  const MEALS = ["Завтрак", "Обед", "Ужин", "Перекус"];
+  const MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+  const WD = ["вс","пн","вт","ср","чт","пт","сб"];
+  const LS_KEY = "kaloriiDnevnik-v1";
+
+  // ---------- State ----------
+  let settings = { ...DEFAULTS };
+  let days = {};           // "YYYY-MM-DD" -> { items: [], weight: number|null }
+  let cur = todayStr();
+  let mode = "100";        // "100" or "portion"
+  let backend = null;      // { saveDay(date), saveSettings() }
+
+  // ---------- Helpers ----------
+  const $ = id => document.getElementById(id);
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function todayStr() { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function parseDate(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); }
+  function fmtDateKey(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function shiftDate(s, n) { const d = parseDate(s); d.setDate(d.getDate() + n); return fmtDateKey(d); }
+  function humanDate(s) {
+    const d = parseDate(s), t = todayStr();
+    const base = d.getDate() + " " + MONTHS[d.getMonth()];
+    if (s === t) return "Сегодня, " + base;
+    if (s === shiftDate(t, -1)) return "Вчера, " + base;
+    return WD[d.getDay()] + ", " + base;
+  }
+  function shortDate(s) { const d = parseDate(s); return d.getDate() + "." + pad(d.getMonth() + 1); }
+  function r0(n) { return Math.round(n); }
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function fmt1(n) { return r1(n).toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 1 }); }
+  function num(v) { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : NaN; }
+  function dayOf(s) { return days[s] || { items: [], weight: null }; }
+  function totals(s) {
+    const t = { kcal: 0, p: 0, f: 0, c: 0 };
+    for (const it of dayOf(s).items) { t.kcal += it.kcal || 0; t.p += it.p || 0; t.f += it.f || 0; t.c += it.c || 0; }
+    return t;
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function setStatus(text, warn) { const s = $("status"); s.textContent = text; s.classList.toggle("warn", !!warn); }
+
+  // ---------- Storage backends ----------
+  function localBackend(note) {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) { const o = JSON.parse(raw); days = o.days || {}; settings = { ...DEFAULTS, ...(o.settings || {}) }; }
+    } catch (e) { /* storage unavailable */ }
+    const persist = () => { try { localStorage.setItem(LS_KEY, JSON.stringify({ days, settings })); } catch (e) {} };
+    setStatus(note, true);
+    return { saveDay: persist, saveSettings: persist };
+  }
+
+  function dbBackend(db, userId) {
+    const col = db.collection("data/users/" + userId);
+    const writing = {}, dirty = {};
+    function write(id, bodyFn) {
+      if (writing[id]) { dirty[id] = bodyFn; return; }
+      writing[id] = true;
+      const body = bodyFn();
+      const p = body === null ? col.doc(id).delete() : col.doc(id).set(body);
+      p.catch(err => {
+        if (err && err.code === "quota_exceeded") setStatus("Хранилище заполнено: удалите старые записи.", true);
+        else if (err && err.code === "invalid_argument") setStatus("У вас нет права сохранять данные в этом приложении.", true);
+        else setStatus("Не удалось сохранить. Проверьте интернет, изменения отправятся при следующем действии.", true);
+      }).finally(() => {
+        writing[id] = false;
+        if (dirty[id]) { const next = dirty[id]; dirty[id] = null; write(id, next); }
+      });
+    }
+    let loaded = false;
+    const timer = setTimeout(() => { if (!loaded) setStatus("Хранилище пока не отвечает. Данные могут быть неактуальны.", true); }, 10000);
+    col.onSnapshot(snap => {
+      const nd = {}; let ns = { ...DEFAULTS };
+      for (const d of snap.docs) {
+        const v = d.data(); if (!v) continue;
+        if (d.id === "settings") ns = { ...DEFAULTS, ...v };
+        else if (v.type === "day") nd[d.id] = { items: Array.isArray(v.items) ? v.items.slice() : [], weight: typeof v.weight === "number" ? v.weight : null };
+      }
+      days = nd; settings = ns;
+      if (!snap.metadata.fromCache) { loaded = true; clearTimeout(timer); setStatus("Данные сохраняются в вашем аккаунте и доступны только вам."); }
+      render();
+    }, err => {
+      clearTimeout(timer);
+      setStatus("Связь с хранилищем потеряна. Обновите страницу позже.", true);
+    });
+    return {
+      saveDay(date) {
+        write(date, () => {
+          const d = days[date];
+          if (!d || (!d.items.length && d.weight == null)) return null;
+          return { type: "day", date, items: d.items, weight: d.weight };
+        });
+      },
+      saveSettings() { write("settings", () => ({ ...settings })); }
+    };
+  }
+
+  async function initStorage() {
+    let db = null, user = null;
+    try {
+      if (window.claude && typeof window.claude.use === "function") {
+        [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      }
+    } catch (e) { db = null; }
+    let id = null;
+    if (db && user) { try { id = await user.id(); } catch (e) { id = null; } }
+    if (db && id) backend = dbBackend(db, id);
+    else backend = localBackend("Войдите в claude.ai, чтобы данные сохранялись в аккаунте. Сейчас они хранятся только в этом браузере.");
+    render();
+  }
+
+  // ---------- Product lookup ----------
+  function knownProducts() {
+    const map = new Map();
+    for (const f of FOODS) map.set(f.name.toLowerCase(), f);
+    // the user's own products, remembered from history (per 100 g only)
+    for (const k of Object.keys(days)) for (const it of days[k].items) {
+      if (it.per100 && !map.has(it.name.toLowerCase())) map.set(it.name.toLowerCase(), { name: it.name, ...it.per100, piece: 0, unit: "" });
+    }
+    return map;
+  }
+  function fillDatalist() {
+    const dl = $("foodList"); dl.textContent = "";
+    for (const f of knownProducts().values()) { const o = document.createElement("option"); o.value = f.name; dl.appendChild(o); }
+  }
+  let currentProduct = null;
+  function applyProduct(name) {
+    const f = knownProducts().get(name.trim().toLowerCase());
+    currentProduct = f || null;
+    if (f) {
+      setMode("100");
+      $("fKcal").value = f.kcal; $("fP").value = f.p; $("fF").value = f.f; $("fC").value = f.c;
+      if (!$("fGrams").value) $("fGrams").value = f.piece || 100;
+    }
+    const pb = $("pieceBtn");
+    if (f && f.piece) { pb.hidden = false; pb.textContent = "+1 " + f.unit + " (" + f.piece + " г)"; } else pb.hidden = true;
+    updatePreview();
+  }
+  function setMode(m) {
+    mode = m;
+    $("mode100").setAttribute("aria-pressed", m === "100");
+    $("modePortion").setAttribute("aria-pressed", m === "portion");
+    $("kcalLbl").textContent = m === "100" ? "Ккал/100" : "Ккал";
+    $("gramsField").querySelector("span").textContent = m === "100" ? "Вес, г" : "Вес, г (необяз.)";
+    updatePreview();
+  }
+  function computeEntry() {
+    const g = num($("fGrams").value), k = num($("fKcal").value);
+    const p = num($("fP").value) || 0, f = num($("fF").value) || 0, c = num($("fC").value) || 0;
+    if (!isFinite(k)) return null;
+    if (mode === "100") {
+      if (!isFinite(g) || g <= 0) return null;
+      const m = g / 100;
+      return { grams: g, kcal: k * m, p: p * m, f: f * m, c: c * m, per100: { kcal: k, p, f, c } };
+    }
+    return { grams: isFinite(g) && g > 0 ? g : null, kcal: k, p, f, c, per100: null };
+  }
+  function updatePreview() {
+    const pv = $("preview"), e = computeEntry();
+    pv.textContent = "";
+    if (!e) { pv.appendChild(el("span", "hint", mode === "100" ? "Укажите вес порции и калорийность на 100 г (есть на упаковке)." : "Укажите калории всей порции. БЖУ можно не заполнять.")); return; }
+    const add = (lbl, v, unit) => { const s = el("span"); s.append(lbl + " "); s.appendChild(el("b", "num", v)); s.append(unit); pv.appendChild(s); };
+    add("Итого:", r0(e.kcal), " ккал");
+    add("Б", fmt1(e.p), " г"); add("Ж", fmt1(e.f), " г"); add("У", fmt1(e.c), " г");
+  }
+
+  // ---------- Mutations ----------
+  function ensureDay(s) { if (!days[s]) days[s] = { items: [], weight: null }; return days[s]; }
+  function addItem(ev) {
+    ev.preventDefault();
+    const err = $("formError"); err.hidden = true;
+    const name = $("fName").value.trim();
+    const e = computeEntry();
+    if (!name) { err.textContent = "Впишите название продукта."; err.hidden = false; return; }
+    if (!e) { err.textContent = mode === "100" ? "Нужны вес и калории на 100 г." : "Нужны калории порции."; err.hidden = false; return; }
+    const d = ensureDay(cur);
+    d.items = d.items.concat([{ id: uid(), name, meal: $("fMeal").value, grams: e.grams, kcal: r1(e.kcal), p: r1(e.p), f: r1(e.f), c: r1(e.c), per100: e.per100 }]);
+    backend.saveDay(cur);
+    $("fName").value = ""; $("fGrams").value = ""; $("fKcal").value = ""; $("fP").value = ""; $("fF").value = ""; $("fC").value = "";
+    currentProduct = null; $("pieceBtn").hidden = true;
+    updatePreview(); render(); $("fName").focus();
+  }
+  function removeItem(id) {
+    const d = ensureDay(cur);
+    d.items = d.items.filter(i => i.id !== id);
+    backend.saveDay(cur); render();
+  }
+  function saveWeight() {
+    const w = num($("wInput").value);
+    if (!isFinite(w) || w < 30 || w > 300) { $("wInput").focus(); return; }
+    ensureDay(cur).weight = r1(w);
+    backend.saveDay(cur); render();
+  }
+  function clearWeight() { ensureDay(cur).weight = null; backend.saveDay(cur); render(); }
+
+  // ---------- Rendering ----------
+  function pct(a, b) { return b > 0 ? Math.max(0, Math.min(100, a / b * 100)) : 0; }
+
+  function renderSummary() {
+    const t = totals(cur), S = settings;
+    $("eaten").textContent = r0(t.kcal);
+    $("target").textContent = S.kcal;
+    const left = S.kcal - t.kcal, over = left < 0;
+    const pill = $("leftPill");
+    pill.textContent = over ? "Перебор " + r0(-left) + " ккал" : "Осталось " + r0(left) + " ккал";
+    pill.classList.toggle("over", over);
+    $("kcalBar").classList.toggle("over", over);
+    $("kcalBar").firstElementChild.style.width = pct(t.kcal, S.kcal) + "%";
+    $("mP").textContent = r0(t.p) + " / " + S.p + " г"; $("bP").style.width = pct(t.p, S.p) + "%";
+    $("mF").textContent = r0(t.f) + " / " + S.f + " г"; $("bF").style.width = pct(t.f, S.f) + "%";
+    $("mC").textContent = r0(t.c) + " / " + S.c + " г"; $("bC").style.width = pct(t.c, S.c) + "%";
+  }
+
+  function renderLog() {
+    const box = $("log"); box.textContent = "";
+    const items = dayOf(cur).items;
+    $("itemCount").textContent = items.length ? items.length + " зап." : "";
+    if (!items.length) { box.appendChild(el("div", "empty", "За этот день записей нет. Добавьте первый продукт в форме выше.")); return; }
+    for (const meal of MEALS) {
+      const list = items.filter(i => (i.meal || "Перекус") === meal);
+      if (!list.length) continue;
+      const g = el("div", "meal");
+      const h = el("div", "meal-head");
+      h.appendChild(el("span", "label", meal));
+      h.appendChild(el("span", "label num", r0(list.reduce((s, i) => s + (i.kcal || 0), 0)) + " ккал"));
+      g.appendChild(h);
+      for (const it of list) {
+        const row = el("div", "item");
+        const left = el("div");
+        left.appendChild(el("div", "name", it.name));
+        left.appendChild(el("div", "meta num", (it.grams ? r0(it.grams) + " г · " : "") + "Б " + fmt1(it.p) + " · Ж " + fmt1(it.f) + " · У " + fmt1(it.c)));
+        row.appendChild(left);
+        row.appendChild(el("div", "kc num", r0(it.kcal) + " ккал"));
+        const del = el("button", "ghost", "✕");
+        del.type = "button"; del.setAttribute("aria-label", "Удалить " + it.name);
+        del.addEventListener("click", () => removeItem(it.id));
+        row.appendChild(del);
+        g.appendChild(row);
+      }
+      box.appendChild(g);
+    }
+  }
+
+  function weightSeries() {
+    const pts = Object.keys(days).filter(k => typeof days[k].weight === "number").sort().map(k => ({ date: k, w: days[k].weight }));
+    return pts;
+  }
+  function currentWeight() { const s = weightSeries(); return s.length ? s[s.length - 1] : null; }
+  function weekAvg() {
+    const s = weightSeries(); if (!s.length) return null;
+    const lastD = s[s.length - 1].date, from = shiftDate(lastD, -6);
+    const w = s.filter(p => p.date >= from); return w.reduce((a, p) => a + p.w, 0) / w.length;
+  }
+
+  function renderGoal() {
+    const S = settings, start = S.startWeight, goal = S.goalWeight;
+    $("goalRange").textContent = fmt1(start) + " → " + fmt1(goal) + " кг";
+    const cw = currentWeight();
+    const now = cw ? cw.w : start;
+    const avg = weekAvg();
+    $("gNow").textContent = fmt1(now) + " кг";
+    $("gAvg").textContent = avg != null ? "среднее за 7 дн.: " + fmt1(avg) : "вес ещё не записан";
+    const lost = start - now, total = start - goal;
+    $("gLost").textContent = (lost >= 0 ? "−" : "+") + fmt1(Math.abs(lost)) + " кг";
+    const progress = total > 0 ? Math.max(0, Math.min(100, lost / total * 100)) : 0;
+    $("gPct").textContent = r0(progress) + "% пути";
+    const left = Math.max(0, now - goal);
+    $("gLeft").textContent = fmt1(left) + " кг";
+
+    // pace and forecast
+    const s = weightSeries(); let eta = "темп появится через неделю записей";
+    if (s.length >= 2) {
+      const first = s[0], last = s[s.length - 1];
+      const daysSpan = (parseDate(last.date) - parseDate(first.date)) / 86400000;
+      if (daysSpan >= 7) {
+        const perWeek = (first.w - last.w) / daysSpan * 7;
+        if (perWeek > 0.05 && left > 0) {
+          const d = parseDate(last.date); d.setDate(d.getDate() + Math.round(left / perWeek * 7));
+          eta = fmt1(perWeek) + " кг/нед · к " + MONTHS[d.getMonth()].slice(0, 3) + " " + d.getFullYear();
+        } else if (left === 0) eta = "цель достигнута";
+        else eta = "вес стоит: см. советы тренера";
+      }
+    }
+    if (left === 0) eta = "цель достигнута!";
+    $("gEta").textContent = eta;
+
+    // track
+    const tr = $("track"); tr.querySelectorAll(".tick").forEach(t => t.remove());
+    tr.firstElementChild.style.width = progress + "%";
+    const labels = $("trackLabels"); labels.textContent = "";
+    const marks = [start].concat(S.stages.filter(x => x < start && x > goal)).concat([goal]);
+    marks.forEach((m, i) => {
+      const p = total > 0 ? (start - m) / total * 100 : 0;
+      const sp = el("span", "num", fmt1(m)); sp.style.left = p + "%"; labels.appendChild(sp);
+      if (i > 0 && i < marks.length - 1) { const t = el("span", "tick"); t.style.left = "calc(" + p + "% - 1px)"; tr.appendChild(t); }
+    });
+
+    // stages
+    const st = $("stages"); st.textContent = "";
+    const stageList = S.stages.slice().sort((a, b) => b - a);
+    let prev = start, foundNow = false;
+    stageList.forEach((target, i) => {
+      const row = el("div", "stage");
+      let state, badgeCls;
+      if (now <= target) { state = "готово"; badgeCls = "badge done"; }
+      else if (!foundNow) { state = "сейчас"; badgeCls = "badge now"; foundNow = true; }
+      else { state = "впереди"; badgeCls = "badge"; }
+      row.appendChild(el("span", badgeCls, state));
+      row.appendChild(el("span", "", "Этап " + (i + 1) + ": до " + fmt1(target) + " кг"));
+      const need = now - target;
+      row.appendChild(el("span", "num hint", need > 0 ? "ещё " + fmt1(need) + " кг" : "✓"));
+      st.appendChild(row);
+      prev = target;
+    });
+
+    // weight input for current day
+    const dw = dayOf(cur).weight;
+    $("wLabel").textContent = "Вес за " + (cur === todayStr() ? "сегодня" : shortDate(cur)) + ", кг";
+    if (document.activeElement !== $("wInput")) $("wInput").value = dw != null ? dw : "";
+    $("wSave").textContent = dw != null ? "Обновить вес" : "Записать вес";
+    $("wClear").hidden = dw == null;
+  }
+
+  const NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderWeightChart() {
+    const box = $("wChart"); box.textContent = "";
+    const W = 600, H = 240, L = 44, R = 64, T = 14, B = 28;
+    const svg = svgEl("svg", { class: "chart", viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "График веса" });
+    const S = settings;
+    let pts = weightSeries();
+    // anchor the start weight on the start date if nothing earlier is logged
+    if (!pts.length || pts[0].date > S.startDate) pts = [{ date: S.startDate, w: S.startWeight, start: true }].concat(pts);
+    const ws = pts.map(p => p.w).concat([S.goalWeight, S.startWeight]);
+    let lo = Math.floor(Math.min.apply(null, ws) - 2), hi = Math.ceil(Math.max.apply(null, ws) + 2);
+    const span = hi - lo, step = span > 30 ? 10 : span > 14 ? 5 : 2;
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const t0 = parseDate(pts[0].date).getTime();
+    let t1 = parseDate(pts[pts.length - 1].date).getTime();
+    if (t1 - t0 < 14 * 86400000) t1 = t0 + 14 * 86400000;
+    const x = t => L + (t - t0) / (t1 - t0) * (W - L - R);
+    const y = w => T + (hi - w) / (hi - lo) * (H - T - B);
+
+    for (let v = lo; v <= hi; v += step) {
+      svg.appendChild(svgEl("line", { class: "grid", x1: L, x2: W - R, y1: y(v), y2: y(v) }));
+      svg.appendChild(svgEl("text", { class: "axis", x: L - 8, y: y(v) + 4, "text-anchor": "end" }, v));
+    }
+    // stage and goal lines
+    S.stages.forEach(sv => {
+      if (sv === S.goalWeight || sv < lo || sv > hi) return;
+      svg.appendChild(svgEl("line", { class: "stageline", x1: L, x2: W - R, y1: y(sv), y2: y(sv) }));
+      svg.appendChild(svgEl("text", { class: "lbl stage", x: W - R + 6, y: y(sv) + 4 }, sv + " кг"));
+    });
+    svg.appendChild(svgEl("line", { class: "goalline", x1: L, x2: W - R, y1: y(S.goalWeight), y2: y(S.goalWeight) }));
+    svg.appendChild(svgEl("text", { class: "lbl goal", x: W - R + 6, y: y(S.goalWeight) + 4 }, "цель " + fmt1(S.goalWeight)));
+
+    // x labels: first, last, and middle
+    const xTicks = [t0, (t0 + t1) / 2, t1];
+    xTicks.forEach((t, i) => {
+      const d = new Date(t);
+      svg.appendChild(svgEl("text", { class: "axis", x: x(t), y: H - 8, "text-anchor": i === 0 ? "start" : i === 2 ? "end" : "middle" }, d.getDate() + "." + pad(d.getMonth() + 1)));
+    });
+
+    const coords = pts.map(p => [x(parseDate(p.date).getTime()), y(p.w)]);
+    if (coords.length > 1) {
+      const line = coords.map((c, i) => (i ? "L" : "M") + c[0].toFixed(1) + " " + c[1].toFixed(1)).join(" ");
+      const area = line + " L" + coords[coords.length - 1][0].toFixed(1) + " " + (H - B) + " L" + coords[0][0].toFixed(1) + " " + (H - B) + " Z";
+      svg.appendChild(svgEl("path", { class: "warea", d: area }));
+      svg.appendChild(svgEl("path", { class: "wline", d: line }));
+    }
+    coords.forEach((c, i) => {
+      const last = i === coords.length - 1;
+      const dot = svgEl("circle", { class: "wdot" + (last ? " last" : ""), cx: c[0], cy: c[1], r: last ? 5 : 3.5 });
+      dot.appendChild(svgEl("title", {}, shortDate(pts[i].date) + ": " + fmt1(pts[i].w) + " кг" + (pts[i].start ? " (старт)" : "")));
+      svg.appendChild(dot);
+    });
+    const lc = coords[coords.length - 1];
+    svg.appendChild(svgEl("text", { class: "lbl", x: Math.min(lc[0], W - R - 4), y: lc[1] - 10, "text-anchor": "end", fill: "var(--prot)" }, fmt1(pts[pts.length - 1].w)));
+    if (pts.length === 1) svg.appendChild(svgEl("text", { class: "chart-empty", x: (L + W - R) / 2, y: T + 24, "text-anchor": "middle" }, "Записывайте вес, и здесь появится линия"));
+    box.appendChild(svg);
+  }
+
+  function renderKcalChart() {
+    const box = $("kChart"); box.textContent = "";
+    const W = 600, H = 200, L = 44, R = 10, T = 12, B = 28;
+    const svg = svgEl("svg", { class: "chart", viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Калории за 14 дней" });
+    const end = cur > todayStr() ? cur : todayStr();
+    const list = []; for (let i = 13; i >= 0; i--) { const d = shiftDate(end, -i); list.push({ date: d, kcal: totals(d).kcal }); }
+    const target = settings.kcal;
+    const maxV = Math.max(target * 1.25, Math.max.apply(null, list.map(d => d.kcal)));
+    const top = Math.ceil(maxV / 500) * 500;
+    const y = v => T + (top - v) / top * (H - T - B);
+    for (let v = 0; v <= top; v += top > 3000 ? 1000 : 500) {
+      svg.appendChild(svgEl("line", { class: "grid", x1: L, x2: W - R, y1: y(v), y2: y(v) }));
+      svg.appendChild(svgEl("text", { class: "axis", x: L - 8, y: y(v) + 4, "text-anchor": "end" }, v));
+    }
+    const slot = (W - L - R) / list.length, bw = slot * 0.62;
+    list.forEach((d, i) => {
+      const bx = L + i * slot + (slot - bw) / 2;
+      if (d.kcal > 0) {
+        const r = svgEl("rect", { class: (d.kcal > target ? "bar-over" : "bar-ok") + (d.date === cur ? " bar-sel" : ""), x: bx, y: y(d.kcal), width: bw, height: Math.max(1, y(0) - y(d.kcal)), rx: 3 });
+        r.appendChild(svgEl("title", {}, shortDate(d.date) + ": " + r0(d.kcal) + " ккал"));
+        svg.appendChild(r);
+      }
+      if (i % 2 === (list.length - 1) % 2) svg.appendChild(svgEl("text", { class: "axis", x: bx + bw / 2, y: H - 8, "text-anchor": "middle" }, shortDate(d.date)));
+    });
+    svg.appendChild(svgEl("line", { class: "target", x1: L, x2: W - R, y1: y(target), y2: y(target) }));
+    box.appendChild(svg);
+    const logged = list.filter(d => d.kcal > 0);
+    $("kAvg").textContent = logged.length
+      ? "Среднее за дни с записями: " + r0(logged.reduce((a, d) => a + d.kcal, 0) / logged.length) + " ккал (" + logged.length + " из 14 дн.). В норме: " + logged.filter(d => d.kcal <= target).length + "."
+      : "Пока нет записей за последние 14 дней.";
+  }
+
+  function renderSettingsForm() {
+    if ($("settingsBox").contains(document.activeElement)) return;
+    const S = settings;
+    $("sKcal").value = S.kcal; $("sP").value = S.p; $("sF").value = S.f; $("sC").value = S.c;
+    $("sStart").value = S.startWeight; $("sGoal").value = S.goalWeight; $("sDate").value = S.startDate;
+    $("sStages").value = S.stages.join(", ");
+  }
+
+  function render() {
+    $("dateLabel").textContent = humanDate(cur);
+    $("todayBtn").hidden = cur === todayStr();
+    renderSummary(); renderLog(); renderGoal(); renderWeightChart(); renderKcalChart(); renderSettingsForm(); fillDatalist();
+  }
+
+  function renderQuick() {
+    const box = $("quickChips");
+    for (const n of QUICK) {
+      const b = el("button", "chip", n); b.type = "button";
+      b.addEventListener("click", () => { $("fName").value = n; $("fGrams").value = ""; applyProduct(n); $("fGrams").focus(); $("fGrams").select(); });
+      box.appendChild(b);
+    }
+  }
+
+  // ---------- Events ----------
+  $("prevDay").addEventListener("click", () => { cur = shiftDate(cur, -1); render(); });
+  $("nextDay").addEventListener("click", () => { cur = shiftDate(cur, 1); render(); });
+  $("todayBtn").addEventListener("click", () => { cur = todayStr(); render(); });
+  $("mode100").addEventListener("click", () => setMode("100"));
+  $("modePortion").addEventListener("click", () => setMode("portion"));
+  $("fName").addEventListener("change", e => applyProduct(e.target.value));
+  $("fName").addEventListener("input", e => { if (knownProducts().has(e.target.value.trim().toLowerCase())) applyProduct(e.target.value); });
+  ["fGrams", "fKcal", "fP", "fF", "fC"].forEach(id => $(id).addEventListener("input", updatePreview));
+  $("pieceBtn").addEventListener("click", () => {
+    if (!currentProduct) return;
+    const g = num($("fGrams").value);
+    // first tap replaces the default 100 g with one piece
+    $("fGrams").value = (isFinite(g) && g > 0 && g !== 100 ? g : 0) + currentProduct.piece;
+    updatePreview();
+  });
+  $("addForm").addEventListener("submit", addItem);
+  $("wSave").addEventListener("click", saveWeight);
+  $("wInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); saveWeight(); } });
+  $("wClear").addEventListener("click", clearWeight);
+  $("setForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = id => num($(id).value);
+    const stages = $("sStages").value.split(/[,;\s]+/).map(num).filter(n => isFinite(n) && n > 0).sort((a, b) => b - a);
+    const ns = {
+      kcal: v("sKcal") || DEFAULTS.kcal, p: v("sP") || 0, f: v("sF") || 0, c: v("sC") || 0,
+      startWeight: v("sStart") || DEFAULTS.startWeight, goalWeight: v("sGoal") || DEFAULTS.goalWeight,
+      startDate: $("sDate").value || DEFAULTS.startDate, stages: stages.length ? stages : DEFAULTS.stages
+    };
+    settings = ns; backend.saveSettings();
+    document.activeElement.blur(); render();
+    const n = $("setSaved"); n.hidden = false; setTimeout(() => { n.hidden = true; }, 2000);
+  });
+
+  // ---------- Start ----------
+  backend = { saveDay() {}, saveSettings() {} };
+  renderQuick(); setMode("100"); render();
+  initStorage();
+})();
+</script>
