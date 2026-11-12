@@ -654,7 +654,8 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
     else document.documentElement.setAttribute("data-theme", t);
     document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.themeVal === t));
     const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
-    document.querySelector('meta[name="theme-color"]').setAttribute("content", bg || "#168058");
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", bg || "#168058");
   }
   const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -1044,9 +1045,20 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
   // ================= Export / import =================
   function exportData() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const filename = "minus-backup-" + today() + ".json";
+    // Inside claude.ai the page saves files through the viewer's downloads capability
+    if (window.claude && typeof window.claude.use === "function") {
+      window.claude.use("downloads").then(dl => {
+        if (!dl) { toast("Скачивание недоступно в этом окне."); return; }
+        return dl.save({ filename, data: blob }).then(() => toast("Копия сохранена"), err => {
+          if (!err || err.code !== "declined") toast("Не удалось сохранить файл.");
+        });
+      });
+      return;
+    }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "minus-backup-" + today() + ".json";
+    a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast("Копия сохранена в загрузки");

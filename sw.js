@@ -1,6 +1,6 @@
 // Service worker: keeps the app working offline.
 // Bump VERSION after changing index.html so phones pick up the new version.
-const VERSION = "minus-v1";
+const VERSION = "minus-v2";
 const CHART_URL = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js";
 const SHELL = [
   "./",
