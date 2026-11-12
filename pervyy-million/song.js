@@ -108,14 +108,22 @@ fx.addMono(I.bell(1800, 0.6, 2, 3.5), ev.keys, 0.15);
 for (const l of sc.endText.lines) fx.addMono(I.scribble(l.d, Math.round(l.t * 7)), l.t, 0.16);
 for (const c of sc.captions) fx.addMono(I.paperFwip(0.9, Math.round(c.t * 10)), c.t - 0.03, 0.14, -0.2);
 
+// ---------- voiceover: load each line, duck the music under it ----------
+const voice = bus();
+for (const v of sc.VO) {
+  const b = MIX.loadAudio(path.join(__dirname, 'voice', v.id + '.wav'), { at: v.at, length: DURATION });
+  b.mixInto(voice, (v.who === 'narrator' ? 1.0 : 1.1) * (v.at >= sc.ev.drop && v.at < sc.ev.house ? 1.4 : 1));
+}
+MIX.duck([drums, bass, pad, keys, lead, brass, fx, verb, dly], voice, { depth: 0.72, attack: 0.03, release: 0.35, threshold: 0.03 });
+
 // ---------- mix ----------
 MIX.sidechain([pad, bass], kicks.filter((t) => t >= ev.drop && t < ev.outro));
 const stems = {
-  drums, bass, pad, keys, lead, brass, fx,
+  drums, bass, pad, keys, lead, brass, fx, voice,
   verb: reverb(verb, { room: 0.84, damp: 0.3 }),
   dly: pingpong(dly, BEAT * 0.75, 0.35, 3500),
 };
-const GAIN = { drums: 0.42, bass: 0.7, pad: 2.4, keys: 0.9, lead: 1.0, brass: 1.9, fx: 0.8, verb: 1, dly: 1 };
+const GAIN = { voice: 2.0, drums: 0.42, bass: 0.7, pad: 2.4, keys: 0.9, lead: 1.0, brass: 1.9, fx: 0.8, verb: 1, dly: 1 };
 const out = path.join(__dirname, 'out');
 const mix = MIX.mixdown(stems, GAIN, { stemDir: process.env.STEMS ? out : null });
 MIX.highpass(mix, 22);

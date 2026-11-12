@@ -159,10 +159,32 @@
     sub: { t: T(19, 2), text: 'Саша, 21 год' },
   };
 
+  // ---------- voiceover (RHVoice, Russian; files in voice/, made by voice/make.sh) ----------
+  // at = start time, dur = measured file length. The music ducks under every line.
+  const VO = [
+    { id: 'n01', at: 0.9, dur: 2.05, who: 'narrator', text: 'Это Саша. Ему десять лет.' },
+    { id: 'n02', at: T(1, 0.5), dur: 2.40, who: 'narrator', text: 'В их семье денег всегда не хватало.' },
+    { id: 'n03', at: T(2, 0.5), dur: 2.26, who: 'narrator', text: 'Мама пересчитывала каждую монету.' },
+    { id: 's01', at: T(3, 2), dur: 0.82, who: 'boy', text: 'Я всё изменю.' },
+    { id: 'n04', at: T(4, 0.5), dur: 2.88, who: 'narrator', text: 'Первые деньги он заработал на лимонаде во дворе.' },
+    { id: 'n05', at: T(5, 1.5), dur: 1.57, who: 'narrator', text: 'Полторы тысячи рублей!' },
+    { id: 'n06', at: T(6, 0.5), dur: 4.23, who: 'narrator', text: 'В пятнадцать он учился по ночам: код, английский, продажи.' },
+    { id: 'n07', at: T(8, 1), dur: 3.42, who: 'narrator', text: 'Первый бизнес прогорел. Долг — двести тысяч.' },
+    { id: 'm01', at: T(10, 0.5), dur: 1.92, who: 'mom', text: 'Упал — вставай. Я в тебя верю.' },
+    { id: 'n08', at: T(11, 0.5), dur: 3.36, who: 'narrator', text: 'В девятнадцать — новая идея и маленькая команда.' },
+    { id: 'n09', at: T(12, 2), dur: 1.93, who: 'narrator', text: 'Каждый день — шаг вперёд.' },
+    { id: 'n10', at: T(14, 2), dur: 1.29, who: 'narrator', text: 'Его первый миллион!' },
+    { id: 'n11', at: T(16, 0.5), dur: 2.50, who: 'narrator', text: 'И первым делом — новый дом для мамы.' },
+    { id: 'n12', at: T(18, 0) + 0.1, dur: 2.38, who: 'narrator', text: 'Первый миллион — это не про деньги.' },
+    { id: 'n13', at: T(19, 0) + 0.1, dur: 0.94, who: 'narrator', text: 'Это про путь.' },
+  ];
+  for (let i = 1; i < VO.length; i++) if (VO[i].at < VO[i - 1].at + VO[i - 1].dur) throw new Error('voice lines overlap: ' + VO[i].id);
+  if (VO.some((v) => v.at < T(13, 3) && v.at + v.dur > T(13, 3))) throw new Error('a voice line runs into the held breath');
+
   const SCORE = {
     FPS, FORMAT, W, H, SAFE, WIDE, DURATION, clock, T, BEAT, S, m, chords, chordAt, HOOK, ev, markers,
     coinNotes, jarCoins, LEMON_TOTAL, ticks, riseBars, riseCounter, musicbox, lead, sad, brass,
-    captions, momLine, promiseLine, endText,
+    captions, momLine, promiseLine, endText, VO,
   };
   if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;
 })();

@@ -21,6 +21,13 @@
 
   const rub = (v) => Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
   const lastBefore = (list, t) => { let k = -1; for (let i = 0; i < list.length; i++) if (list[i].t <= t) k = i; return k; };
+  // simple lip-sync: the mouth flaps while that character's line is playing
+  const talk = (t, who, rest) => {
+    const v = S.VO.find((l) => l.who === who && t >= l.at && t < l.at + l.dur - 0.08);
+    if (!v) return rest;
+    const ph = (t - v.at) * 9 + U.noise1(t * 6, 5) * 1.5;
+    return Math.sin(ph * Math.PI) > 0 ? 'open' : (rest === 'smile' ? 'smile' : 'o');
+  };
 
   // ---------- props ----------
   function wall(ctx, top, bottom, color, seed) {
@@ -167,7 +174,7 @@
     const promise = t >= ev.promise;
     Ch.person(ctx, {
       x: 790, y: 1245, pose: 'sit', s: 0.78, style: BOY,
-      eyes: promise ? 'normal' : 'normal', brows: promise ? 'determined' : 'worried', mouth: promise ? 'flat' : 'wavy',
+      eyes: promise ? 'normal' : 'normal', brows: promise ? 'determined' : 'worried', mouth: talk(t, 'boy', promise ? 'flat' : 'wavy'),
       look: promise ? -0.1 : -lookAt, lookY: promise ? -0.5 : 0.6, headRot: promise ? -0.04 : 0.05,
     });
     table(ctx, 540, 1170, 600);
@@ -275,7 +282,7 @@
     G.rays(ctx, 540, 760, { n: 14, r0: 80, r1: 1300, color: `rgba(255,214,140,${0.25 * u})`, lw: 60, spin: t * 0.05 });
     G.rrect(ctx, 470, 1240, 180, 140, 6, { fill: '#B98A5A', lw: 6, seed: 330, hatch: { color: 'rgba(0,0,0,0.12)', gap: 10 } });
     const up = t > T(10, 2.5);
-    Ch.person(ctx, { x: 340, y: GROUND, pose: 'stand', s: 1.12, style: MOM, eyes: 'normal', brows: 'up', mouth: 'smile', look: 0.5, lookY: 0.5, handR: [500, 1020] });
+    Ch.person(ctx, { x: 340, y: GROUND, pose: 'stand', s: 1.12, style: MOM, eyes: 'normal', brows: 'up', mouth: talk(t, 'mom', 'smile'), look: 0.5, lookY: 0.5, handR: [500, 1020] });
     Ch.person(ctx, { x: 560, y: 1250, pose: 'sit', s: 0.98, style: TEEN, eyes: up ? 'normal' : 'closed', brows: up ? 'determined' : 'worried', mouth: up ? 'smile' : 'flat', look: -0.5, lookY: up ? -0.6 : 0.3, headRot: up ? -0.05 : 0.08 });
     G.bubble(ctx, S.momLine.text, 540, 640, 380, 860, t, S.momLine.t, S.momLine.end, { size: 56 });
   }
